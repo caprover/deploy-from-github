@@ -1,6 +1,6 @@
 # Deploy from Github
 
-There are a few ways you can deploy your app to Caprover, this Github Action leverages the official Caprover CLI to deploy files. It is recommended to add this Github Action as final step multi-step workflow so you can build and test your apps prior to deployments.
+While there are a few ways you can deploy your app to Caprover, this Github Action leverages the official Caprover CLI to deploy your application. It is recommended to add this Github Action as final step multi-step workflow so you can build and test your apps prior to deployments.
 
 To use this Action, you'll need 3 pieces of information saved in your project Github Secrets.
 
