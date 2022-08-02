@@ -5,7 +5,7 @@ author: 'Caprover Contributors'
 inputs:
   server:
     description: 'Captover server URL, i.e. https://captain.apps.your-domain.com.'
-    required: false
+    required: true
   token:
     description: 'App Token'
     required: true
@@ -15,7 +15,7 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'docker://ghcr.io/captover/deploy-from-github:main'
+  image: 'docker://ghcr.io/maietta/deploy-from-github:main'
   env:
     server: ${{ inputs.server }}
     app: ${{ inputs.app }}

@@ -1,4 +1,4 @@
-FROM node:12-alpine
+FROM node:16.16.0-alpine3.16
 
 LABEL org.opencontainers.image.source = "https://github.com/caprover/deploy-from-github"
 
