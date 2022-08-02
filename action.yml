@@ -1,0 +1,22 @@
+name: 'Deploy App to Caprover'
+description: 'Github Action for deploying your app to Caprover.'
+author: 'Caprover Contributors'
+
+inputs:
+  server:
+    description: 'Captover server URL, i.e. https://captain.apps.your-domain.com.'
+    required: true
+  token:
+    description: 'App Token'
+    required: true
+  app:
+    description: 'App Name'
+    required: true
+
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/caprover/deploy-from-github:main'
+  env:
+    server: ${{ inputs.server }}
+    app: ${{ inputs.app }}
+    token: ${{ inputs.token }}
