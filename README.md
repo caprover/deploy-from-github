@@ -1,19 +1,18 @@
 # Deploy from Github
 
-While there are a few ways you can deploy your app to Caprover, this Github Action leverages the official Caprover CLI to deploy your application directly from Github. It is recommended to add this Github Action as a final step in a multi-step workflow so that your apps can be built and/or tested prior to deployment.
+While there are a few ways to deploy an app to Caprover, this Github Action leverages the official Caprover CLI and the App Token strategy to deploy an app directly from Github. 
+This Github Action does require a deploy.tar file to be available to deploy, so an example is provided below to show how we can automagically create this file as part of a deployment workflow strategy.
 
-To use this Action, you'll need 3 pieces of information saved in your project Github Secrets.
+To use this Action, 3 pieces of information must be obtained and stored in Github Secrets.
 
 - APP_NAME secret is the name of your app, exactly as it's specified in Caprover.
 - APP_TOKEN secret is obtained fromt he "Deployment" tab of your in Caprover. Click "Enable App Token" to generate a token.
-- CAPROVER_SERVER secret can be set as a organization secret so it's available to all your projects. Override per project as needed.
+- CAPROVER_SERVER secret can be organization-wide, per project, or per project override and in the format of https://captain.apps.your-domain.com.
 
-The CAPROVER_SERVER secret is specified as the full URL of your Caprover instance, i.e. https://captain.apps.your-domain.com
-
-A sample of how this action can be used is sourced from https://github.com/PremoWeb/SDK-Foundation-Vue/blob/main/.github/workflows/deploy.yml.
+In the following worfklow example, builds are triggered when commit history is pushed or pulled to the main branch. In the first step, the front-end app is built using NPM and it's output saved in dist/. The the following step, a deploy.tar file is then created from this newly minted dist/ direcotry, existing backend/ direcotry and the captain-definition file. Lastly, the newly created deploy.tar file will be sent to Caprover for deployment using the secrets stored in Github.
 
 ```
-name: Build & Deploy
+name: Build App & Deploy
 
 on:
   push:
@@ -50,13 +49,19 @@ jobs:
             backend/
             frontend/dist/
             captain-definition
-            puzzle-image-generator/quotefall
           outPath: deploy.tar
 
-      - uses: caprover/deploy-from-github@v1.0.0
+      - uses: caprover/deploy-from-github@main
         with:
           server: '${{ secrets.CAPROVER_SERVER }}'
           app: '${{ secrets.APP_NAME }}'
           token: '${{ secrets.APP_TOKEN }}'
 
 ```
+
+NOTE: Deployments take place within seconds after the workflow has been processed succesfully with any failed deployments sending an email alert to your email on file with Github.
+
+For more information:
+
+A complete Vue 3 frontend starter project that includes a PHP backend that uses this Github Action can be found at https://github.com/PremoWeb/SDK-Foundation-Vue/.
+The example workflow presented on this page was sourced from https://github.com/PremoWeb/SDK-Foundation-Vue/blob/main/.github/workflows/deploy.yml.

@@ -1,4 +1,4 @@
-name: 'Deploy to Caprover'
+name: 'Deploy App to Caprover'
 description: 'Github Action for deploying your app to Caprover.'
 author: 'Caprover Contributors'
 
@@ -15,7 +15,7 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'docker://ghcr.io/maietta/deploy-from-github:main'
+  image: 'docker://ghcr.io/caprover/deploy-from-github:main'
   env:
     server: ${{ inputs.server }}
     app: ${{ inputs.app }}
