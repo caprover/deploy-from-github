@@ -11,9 +11,6 @@ on:
     tags:
       - v*
 
-  # Run for any PRs.
-  pull_request:
-
   # Create a button to trigger the workflow manually.
   workflow_dispatch:
 
