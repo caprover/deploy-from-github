@@ -1,4 +1,4 @@
-name: 'Deploy App to Caprover'
+name: 'Deploy Github repo to Caprover'
 description: 'Github Action for deploying your app to Caprover.'
 author: 'Caprover Contributors'
 
