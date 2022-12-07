@@ -12,6 +12,12 @@ inputs:
   app:
     description: 'App Name'
     required: true
+  branch:
+    description: 'Branch to be deployed'
+    required: false
+  image:
+    description: 'Docker image to be deployed'
+    required: false
 
 runs:
   using: 'docker'
@@ -20,3 +26,5 @@ runs:
     server: ${{ inputs.server }}
     app: ${{ inputs.app }}
     token: ${{ inputs.token }}
+    image: ${{ inputs.image }}
+    branch: ${{ inputs.branch }}
