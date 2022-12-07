@@ -21,10 +21,11 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'docker://ghcr.io/caprover/deploy-from-github:main'
-  env:
-    server: ${{ inputs.server }}
-    app: ${{ inputs.app }}
-    token: ${{ inputs.token }}
-    image: ${{ inputs.image }}
-    branch: ${{ inputs.branch }}
+  image: 'Dockerfile'
+#   image: 'docker://ghcr.io/caprover/deploy-from-github:main'
+#   env:
+#     server: ${{ inputs.server }}
+#     app: ${{ inputs.app }}
+#     token: ${{ inputs.token }}
+#     image: ${{ inputs.image }}
+#     branch: ${{ inputs.branch }}
