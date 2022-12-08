@@ -16,7 +16,7 @@ Optional:
 
 
 ### Example 1 - deploy using image:
-
+This method is preferred because you end up using Github servers to build your image and your own CapRover server just receives the built image. This is very useful specially if your server resources are limited.
 Specify `CAPROVER_APP_TOKEN` and `CAPROVER_HOST` as secret in your repo. Also change `env` section in the action and you're good to go!
 
 
