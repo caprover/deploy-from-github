@@ -47,6 +47,7 @@ jobs:
                   echo "IMAGE_NAME_WITH_REGISTRY=$DOCKER_REGISTRY/$IMAGE_NAME" >> $GITHUB_ENV
                   export IMAGE_NAME_WITH_REGISTRY=$DOCKER_REGISTRY/$IMAGE_NAME
                   echo "FULL_IMAGE_NAME=$IMAGE_NAME_WITH_REGISTRY:$GITHUB_SHA-gitsha" >> $GITHUB_ENV
+                  echo "CAPROVER_GIT_COMMIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
             - name: Log in to the Container registry
               uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
               with:
