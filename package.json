@@ -1,0 +1,25 @@
+{
+  "name": "deploy-from-github",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Deploy applications to CapRover from GitHub Actions",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.js",
+    "format": "prettier --write \"{src,tests}/**/*.ts\" \"*.{json,yml}\"",
+    "format:check": "prettier --check \"{src,tests}/**/*.ts\" \"*.{json,yml}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run format:check && npm run typecheck && npm test && npm run build && git diff --exit-code -- dist"
+  },
+  "dependencies": {
+    "form-data": "^4.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "vitest": "^5.0.0"
+  }
+}
