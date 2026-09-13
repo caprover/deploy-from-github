@@ -30,6 +30,7 @@ const base: Inputs = {
 const directories: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     directories
       .splice(0)
@@ -51,7 +52,7 @@ function client() {
 
 describe("deploy v2 behavior", () => {
   it("deploys an image with commit metadata", async () => {
-    process.env.GITHUB_SHA = "a".repeat(40);
+    vi.stubEnv("GITHUB_SHA", "a".repeat(40));
     vi.mocked(getHeadCommit).mockResolvedValue("b".repeat(40));
     await deploy({ ...base, image: "image:sha" });
     expect(client().deployImage).toHaveBeenCalledWith(
@@ -60,18 +61,16 @@ describe("deploy v2 behavior", () => {
       "b".repeat(40),
     );
     expect(createGitArchive).not.toHaveBeenCalled();
-    delete process.env.GITHUB_SHA;
   });
 
   it("uses GITHUB_SHA for image metadata when source is not checked out", async () => {
-    process.env.GITHUB_SHA = "a".repeat(40);
+    vi.stubEnv("GITHUB_SHA", "a".repeat(40));
     await deploy({ ...base, image: "image:sha" });
     expect(client().deployImage).toHaveBeenCalledWith(
       "my-api",
       "image:sha",
       "a".repeat(40),
     );
-    delete process.env.GITHUB_SHA;
   });
 
   it("archives and deploys checked-out HEAD, then cleans up", async () => {
@@ -118,21 +117,19 @@ describe("deploy v2 behavior", () => {
       mkdir(path.dirname(tarPath), { recursive: true }),
     );
     await writeFile(tarPath, "fixture");
-    process.env.GITHUB_WORKSPACE = workspace;
+    vi.stubEnv("GITHUB_WORKSPACE", workspace);
     await deploy({ ...base, tarFile: "dist/deploy file.tar" });
     expect(client().uploadArchive).toHaveBeenCalledWith("my-api", tarPath, "");
-    delete process.env.GITHUB_WORKSPACE;
   });
 
   it("fails clearly when the explicit tar is missing", async () => {
     const workspace = await mkdtemp(path.join(tmpdir(), "empty-workspace-"));
     directories.push(workspace);
-    process.env.GITHUB_WORKSPACE = workspace;
+    vi.stubEnv("GITHUB_WORKSPACE", workspace);
     await expect(deploy({ ...base, tarFile: "missing.tar" })).rejects.toThrow(
       `Input "tar-file" does not point to a file inside the GitHub workspace: ${path.join(workspace, "missing.tar")}`,
     );
     await expect(access(path.join(workspace, "missing.tar"))).rejects.toThrow();
-    delete process.env.GITHUB_WORKSPACE;
   });
 
   it("passes working-directory to source packaging", async () => {

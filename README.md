@@ -16,6 +16,8 @@ Deploy checked-out source, a Docker image, or a prepared tar file to CapRover us
 
 This packages the files committed in the checked-out `HEAD` and submits the deployment to CapRover. Generate an app token from the app's **Deployment** tab in CapRover.
 
+App tokens and deployment data are sent to the configured server. Use HTTPS unless the server is reached through a trusted private network.
+
 ## Deploy a Docker image
 
 Build and push the image with the standard Docker actions, then ask CapRover to deploy it:
