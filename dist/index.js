@@ -8881,11 +8881,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path3) {
-      if (!path3 || typeof path3 !== "string") {
+    function lookup(path4) {
+      if (!path4 || typeof path4 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path3).toLowerCase().substr(1);
+      var extension2 = extname("x." + path4).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -9990,7 +9990,7 @@ var require_form_data = __commonJS({
     "use strict";
     var CombinedStream = require_combined_stream();
     var util = require("util");
-    var path3 = require("path");
+    var path4 = require("path");
     var http2 = require("http");
     var https2 = require("https");
     var parseUrl = require("url").parse;
@@ -10064,12 +10064,12 @@ var require_form_data = __commonJS({
         if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs.stat(value.path, function(err, stat) {
+          fs.stat(value.path, function(err, stat3) {
             if (err) {
               callback(err);
               return;
             }
-            var fileSize = stat.size - (value.start ? value.start : 0);
+            var fileSize = stat3.size - (value.start ? value.start : 0);
             callback(null, fileSize);
           });
         }
@@ -10121,11 +10121,11 @@ var require_form_data = __commonJS({
     FormData2.prototype._getContentDisposition = function(value, options) {
       var filename;
       if (typeof options.filepath === "string") {
-        filename = path3.normalize(options.filepath).replace(/\\/g, "/");
+        filename = path4.normalize(options.filepath).replace(/\\/g, "/");
       } else if (options.filename || value && (value.name || value.path)) {
-        filename = path3.basename(options.filename || value && (value.name || value.path));
+        filename = path4.basename(options.filename || value && (value.name || value.path));
       } else if (value && value.readable && hasOwn(value, "httpVersion")) {
-        filename = path3.basename(value.client._httpMessage.path || "");
+        filename = path4.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         return 'filename="' + escapeHeaderParam(filename) + '"';
@@ -10324,22 +10324,38 @@ var import_node_os = require("node:os");
 var import_node_path = __toESM(require("node:path"));
 var import_node_util = require("node:util");
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
-async function createGitArchive(ref, cwd = process.env.GITHUB_WORKSPACE || process.cwd()) {
+async function getHeadCommit(workspace = process.env.GITHUB_WORKSPACE || process.cwd()) {
+  const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+    cwd: workspace
+  });
+  const gitHash = stdout.trim();
+  if (!/^[a-f0-9]{40}$/.test(gitHash)) {
+    throw new Error(`git rev-parse returned an invalid commit: ${gitHash}`);
+  }
+  return gitHash;
+}
+async function createGitArchive(workingDirectory, workspace = process.env.GITHUB_WORKSPACE || process.cwd()) {
   const directory = await (0, import_promises.mkdtemp)(import_node_path.default.join((0, import_node_os.tmpdir)(), "caprover-deploy-"));
   const archivePath = import_node_path.default.join(directory, "deploy.tar");
   try {
+    const workspacePath = await (0, import_promises.realpath)(workspace);
+    const sourcePath = await (0, import_promises.realpath)(
+      import_node_path.default.resolve(workspacePath, workingDirectory)
+    );
+    const sourceStat = await (0, import_promises.stat)(sourcePath);
+    const relativeSource = import_node_path.default.relative(workspacePath, sourcePath);
+    if (!sourceStat.isDirectory() || relativeSource === ".." || relativeSource.startsWith(`..${import_node_path.default.sep}`) || import_node_path.default.isAbsolute(relativeSource)) {
+      throw new Error(
+        "must resolve to a directory inside the GitHub workspace"
+      );
+    }
+    const treeRef = relativeSource ? `HEAD:${relativeSource.split(import_node_path.default.sep).join("/")}` : "HEAD";
     await execFileAsync(
       "git",
-      ["archive", "--format=tar", "--output", archivePath, ref],
-      { cwd }
+      ["archive", "--format=tar", "--output", archivePath, treeRef],
+      { cwd: workspacePath }
     );
-    const { stdout } = await execFileAsync("git", ["rev-parse", ref], {
-      cwd
-    });
-    const gitHash = stdout.trim();
-    if (!/^[a-f0-9]{40}$/.test(gitHash)) {
-      throw new Error(`git rev-parse returned an invalid commit: ${gitHash}`);
-    }
+    const gitHash = await getHeadCommit(workspacePath);
     return {
       path: archivePath,
       gitHash,
@@ -10348,7 +10364,9 @@ async function createGitArchive(ref, cwd = process.env.GITHUB_WORKSPACE || proce
   } catch (error) {
     await (0, import_promises.rm)(directory, { recursive: true, force: true });
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to archive Git ref "${ref}": ${message}`);
+    throw new Error(
+      `Failed to archive input "working-directory" (${workingDirectory}): ${message}`
+    );
   }
 }
 
@@ -10372,13 +10390,13 @@ var CapRoverClient = class {
     form.append("gitHash", gitHash);
     await this.request(app, form, form.getHeaders());
   }
-  async deployImage(app, imageName) {
+  async deployImage(app, imageName, gitHash) {
     const body = JSON.stringify({
       captainDefinitionContent: JSON.stringify({
         schemaVersion: 2,
         imageName
       }),
-      gitHash: ""
+      gitHash
     });
     await this.request(app, body, {
       "content-type": "application/json",
@@ -10490,15 +10508,34 @@ function setFailed(message) {
 // src/deploy.ts
 async function deploy(inputs) {
   const client = new CapRoverClient(inputs.server, inputs.token);
+  info("Deploying to CapRover");
+  info("");
+  info(`App:       ${inputs.app}`);
+  info(`Server:    ${inputs.server}`);
   if (inputs.image) {
-    info(`Deploying image ${inputs.image} to ${inputs.app}...`);
-    await client.deployImage(inputs.app, inputs.image);
+    let gitHash = "";
+    try {
+      gitHash = await getHeadCommit();
+    } catch {
+      const candidateGitHash = (process.env.GITHUB_SHA || "").trim();
+      if (/^[a-f0-9]{40}$/i.test(candidateGitHash)) gitHash = candidateGitHash;
+    }
+    info(`Image:     ${inputs.image}`);
+    if (gitHash) info(`Commit:    ${gitHash.slice(0, 7)}`);
+    info("");
+    await client.deployImage(inputs.app, inputs.image, gitHash);
     return;
   }
-  if (inputs.branch) {
-    const archive = await createGitArchive(inputs.branch);
+  if (!inputs.tarFile) {
+    const archive = await createGitArchive(inputs.workingDirectory);
     try {
-      info(`Deploying Git ref ${inputs.branch} to ${inputs.app}...`);
+      info("Source:    Git commit");
+      info(`Commit:    ${archive.gitHash.slice(0, 7)}`);
+      if (inputs.workingDirectory !== ".") {
+        info(`Directory: ${inputs.workingDirectory}`);
+      }
+      info("");
+      info("\u2713 Source packaged");
       await client.uploadArchive(inputs.app, archive.path, archive.gitHash);
     } finally {
       await archive.cleanup();
@@ -10506,17 +10543,30 @@ async function deploy(inputs) {
     return;
   }
   const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
-  const tarPath = import_node_path2.default.resolve(workspace, "deploy.tar");
+  const workspacePath = await (0, import_promises2.realpath)(workspace);
+  const requestedTarPath = import_node_path2.default.resolve(workspacePath, inputs.tarFile);
+  let tarPath;
   try {
-    await (0, import_promises2.access)(tarPath);
+    tarPath = await (0, import_promises2.realpath)(requestedTarPath);
+    const relativeTarPath = import_node_path2.default.relative(workspacePath, tarPath);
+    if (relativeTarPath === ".." || relativeTarPath.startsWith(`..${import_node_path2.default.sep}`) || import_node_path2.default.isAbsolute(relativeTarPath)) {
+      throw new Error("path is outside the workspace");
+    }
+    const tarStat = await (0, import_promises2.stat)(tarPath);
+    if (!tarStat.isFile()) throw new Error("path is not a file");
   } catch {
-    throw new Error(`Deployment archive was not found: ${tarPath}`);
+    throw new Error(
+      `Input "tar-file" does not point to a file inside the GitHub workspace: ${requestedTarPath}`
+    );
   }
-  info(`Deploying ${tarPath} to ${inputs.app}...`);
+  info(`Source:    Prepared tar`);
+  info(`Tar file:  ${inputs.tarFile}`);
+  info("");
   await client.uploadArchive(inputs.app, tarPath, "");
 }
 
 // src/inputs.ts
+var import_node_path3 = __toESM(require("node:path"));
 function readRequiredInput(name) {
   const value = getInput(name).trim();
   if (!value) {
@@ -10527,12 +10577,35 @@ function readRequiredInput(name) {
 function getInputs() {
   const token = readRequiredInput("token");
   setSecret(token);
+  const server = readRequiredInput("server");
+  try {
+    const url = new URL(server);
+    if (url.protocol !== "http:" && url.protocol !== "https:")
+      throw new Error();
+  } catch {
+    throw new Error('Input "server" must be a valid HTTP or HTTPS URL');
+  }
+  const image = getInput("image").trim();
+  const tarFile = getInput("tar-file").trim();
+  const normalizedWorkingDirectory = import_node_path3.default.normalize(
+    getInput("working-directory").trim() || "."
+  );
+  const workingDirectory = normalizedWorkingDirectory === `.${import_node_path3.default.sep}` ? "." : normalizedWorkingDirectory;
+  if (image && tarFile) {
+    throw new Error('Inputs "image" and "tar-file" cannot be used together');
+  }
+  if ((image || tarFile) && workingDirectory !== ".") {
+    throw new Error(
+      'Input "working-directory" can only be used for source deployment'
+    );
+  }
   return {
-    server: readRequiredInput("server"),
+    server,
     app: readRequiredInput("app"),
     token,
-    branch: getInput("branch").trim(),
-    image: getInput("image").trim()
+    image,
+    tarFile,
+    workingDirectory
   };
 }
 
@@ -10540,7 +10613,7 @@ function getInputs() {
 async function run() {
   try {
     await deploy(getInputs());
-    info("Deployment accepted by CapRover");
+    info("\u2713 Deployment accepted by CapRover");
   } catch (error) {
     setFailed(error instanceof Error ? error.message : String(error));
   }

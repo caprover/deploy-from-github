@@ -1,6 +1,6 @@
-name: "Deploy Github repo to Caprover"
-description: "Github Action for deploying your app to Caprover."
-author: "Caprover Contributors"
+name: "Deploy to CapRover"
+description: "Deploy checked-out source, a Docker image, or a prepared tar to CapRover."
+author: "CapRover Contributors"
 
 inputs:
   server:
@@ -12,12 +12,16 @@ inputs:
   app:
     description: "App Name"
     required: true
-  branch:
-    description: "Branch to be deployed"
-    required: false
   image:
     description: "Docker image to be deployed"
     required: false
+  tar-file:
+    description: "Prepared deployment tar file, relative to the GitHub workspace"
+    required: false
+  working-directory:
+    description: "Directory within the checked-out repository to deploy"
+    required: false
+    default: "."
 
 runs:
   using: "node24"

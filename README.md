@@ -1,138 +1,103 @@
-# Deploy from Github
+# Deploy to CapRover
 
-This Github Action uses CapRover's App Token strategy to deploy an app directly from Github.
-An example workflow provided below, shows how we can automagically create a deploy.tar file as a required part of a build & deployment strategy.
+Deploy checked-out source, a Docker image, or a prepared tar file to CapRover using an app token.
 
-Using this Github Action requires the following three pieces of information to be entered into Github Secrets for your project repository:
+## Quick start
 
-- `app` secret is the name of your app, exactly as it's specified in Caprover.
-- `token` secret is obtained fromt he "Deployment" tab of the app in Caprover. Click "Enable App Token" to generate a token.
-- `server` secret can be organization-wide, per project, or per project override and in the format of https://captain.apps.your-domain.com.
-Optional:
-- `image` secret can be used to specify the specific image you want to deploy, this is particularly useful when you want to build on Github.
-- `branch` secret can be used to specify the branch you want to deploy to CapRover.
-- If `image` and `branch` are empty, this action expects a tar file located at the root of the project `./deploy.tar` to deploy
+```yaml
+- uses: actions/checkout@v6
+
+- uses: caprover/deploy-from-github@v2
+  with:
+    server: https://captain.example.com
+    app: my-api
+    token: ${{ secrets.CAPROVER_APP_TOKEN }}
+```
+
+This packages the files committed in the checked-out `HEAD` and submits the deployment to CapRover. Generate an app token from the app's **Deployment** tab in CapRover.
 
 App tokens and deployment data are sent to the configured server. Use HTTPS unless the server is reached through a trusted private network.
 
+## Deploy a Docker image
 
-
-### Example 1 - deploy using image:
-This method is preferred because you end up using Github servers to build your image and your own CapRover server just receives the built image. This is very useful specially if your server resources are limited.
-Specify `CAPROVER_APP_TOKEN` and `CAPROVER_HOST` as secret in your repo. Also change `env` section in the action and you're good to go!
-
+Build and push the image with the standard Docker actions, then ask CapRover to deploy it:
 
 ```yaml
-name: Deploy to staging
+- uses: actions/checkout@v6
 
-env:
-    CONTEXT_DIR: './'
-    IMAGE_NAME: ${{ github.repository }}/staging
-    DOCKERFILE: Dockerfile.staging
-    CAPROVER_APP: myapp-staging
-    DOCKER_REGISTRY: ghcr.io
+- uses: docker/login-action@v3
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}
 
-on:
-    push:
-        branches:
-            - main
-        # you can specify path if you have a monorepo and you want to deploy if particular directory is changed, make sure to update `CONTEXT_DIR` too
-        # paths:
-        #   - "backend-app/**"
+- uses: docker/build-push-action@v6
+  with:
+    context: .
+    push: true
+    tags: ghcr.io/acme/my-api:${{ github.sha }}
 
-jobs:
-    build-and-publish:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v1
-            - run: |
-                  echo "IMAGE_NAME_WITH_REGISTRY=$DOCKER_REGISTRY/$IMAGE_NAME" >> $GITHUB_ENV
-                  export IMAGE_NAME_WITH_REGISTRY=$DOCKER_REGISTRY/$IMAGE_NAME
-                  echo "FULL_IMAGE_NAME=$IMAGE_NAME_WITH_REGISTRY:$GITHUB_SHA-gitsha" >> $GITHUB_ENV
-                  echo "CAPROVER_GIT_COMMIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
-            - name: Log in to the Container registry
-              uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-              with:
-                  registry: ${{ env.DOCKER_REGISTRY }}
-                  username: ${{ github.actor }}
-                  password: ${{ secrets.GITHUB_TOKEN }}
-            - name: Build and Push Release to DockerHub
-              shell: bash
-              run: |
-                  set -e
-
-                  cd $CONTEXT_DIR
-                  rm /tmp/build_args || echo OK
-                  env >/tmp/build_args
-                  echo "--build-arg \""$(cat /tmp/build_args | sed -z 's/\n/" --build-arg "/g')"IGNORE_VAR=IGNORE_VAR\"" >/tmp/build_args
-                  BUILD_ARGS=$(cat /tmp/build_args)
-                  COMMAND="docker build -t $FULL_IMAGE_NAME -t $IMAGE_NAME_WITH_REGISTRY:latest -f $DOCKERFILE $BUILD_ARGS --no-cache ."
-                  /bin/bash -c "$COMMAND"
-                  docker push $IMAGE_NAME_WITH_REGISTRY:latest
-                  docker push $FULL_IMAGE_NAME
-                  rm /tmp/build_args
-            - name: Deploy to CapRover
-              uses: caprover/deploy-from-github@d76580d79952f6841c453bb3ed37ef452b19752c
-              with:
-                  server: ${{ secrets.CAPROVER_HOST }}
-                  app: ${{ env.CAPROVER_APP }}
-                  token: '${{ secrets.CAPROVER_APP_TOKEN }}'
-                  image: '${{ env.FULL_IMAGE_NAME }}'
-
+- uses: caprover/deploy-from-github@v2
+  with:
+    server: https://captain.example.com
+    app: my-api
+    token: ${{ secrets.CAPROVER_APP_TOKEN }}
+    image: ghcr.io/acme/my-api:${{ github.sha }}
 ```
 
-### Example 2 - deploy using `./deploy.tar`
+## Monorepo
 
-The example workflow contains a few steps to process your source code into a deployed app in Caprover. The first step uses the a CI/CD version of Node Package Manager (NPM) to build the front-end from source code. The second step packages up your newly minted dist/ directory, the existing backend/ directory and captain-definition file into a deploy.tar file. In the last step the deploy.tar file is picked up by this Github Action and using the provided secrets, will send the file to the Caprover server where it will be deployed.
+`working-directory` packages that directory's committed contents at the root of the deployment tar:
 
 ```yaml
-name: Build App & Deploy
+- uses: actions/checkout@v6
 
-on:
-  push:
-    branches: [ "main" ]
-
-  pull_request:
-    branches: [ "main" ]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x]
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-      - run: npm ci
-      - run: npm run build --if-present
-      - run: npm run test --if-present
-
-      # Future plans in the works to create tarball from within the caprover/deploy-from-github action.
-      - uses: a7ul/tar-action@v1.1.0
-        with:
-          command: c
-          cwd: "./"
-          files: |
-            backend/
-            frontend/dist/
-            captain-definition
-          outPath: deploy.tar
-
-      - uses: caprover/deploy-from-github@main
-        with:
-          server: '${{ secrets.CAPROVER_SERVER }}'
-          app: '${{ secrets.APP_NAME }}'
-          token: '${{ secrets.APP_TOKEN }}'
-          branch: '${{ secrets.DEPLOY_BRANCH }}' # optional
-          image: '${{ secrets.DEPLOY_IMAGE }}' # optional
-
+- uses: caprover/deploy-from-github@v2
+  with:
+    server: https://captain.example.com
+    app: my-api
+    token: ${{ secrets.CAPROVER_APP_TOKEN }}
+    working-directory: apps/api
 ```
 
-NOTE: Deployments take place within seconds after the workflow has been processed succesfully with any failed deployments sending an email alert to your email on file with Github.
+## Deploy a prepared tar
+
+Use `tar-file` when an earlier step produces the exact deployment archive:
+
+```yaml
+- uses: actions/checkout@v6
+
+- uses: caprover/deploy-from-github@v2
+  with:
+    server: https://captain.example.com
+    app: my-api
+    token: ${{ secrets.CAPROVER_APP_TOKEN }}
+    tar-file: ./dist/deploy.tar
+```
+
+## Inputs
+
+| Input               | Required | Default | Description                                                |
+| ------------------- | -------- | ------- | ---------------------------------------------------------- |
+| `server`            | Yes      |         | CapRover URL, such as `https://captain.example.com`        |
+| `app`               | Yes      |         | CapRover app name                                          |
+| `token`             | Yes      |         | App token from the app's Deployment tab                    |
+| `image`             | No       |         | Existing Docker image for CapRover to deploy               |
+| `tar-file`          | No       |         | Prepared tar file, resolved from the GitHub workspace      |
+| `working-directory` | No       | `.`     | Source directory whose committed contents should be packed |
+
+`image` and `tar-file` are mutually exclusive. `working-directory` applies to source deployments.
+
+## Private registries
+
+CapRover pulls an image from the registry during deployment. Configure the registry credentials in CapRover before deploying a private image. Logging the GitHub runner into the registry only grants access to the runner.
+
+## Migration from v1
+
+- Replace `caprover/deploy-from-github@v1` with `caprover/deploy-from-github@v2` when you are ready to migrate.
+- The `branch` input has been removed. Check out the desired commit before running the action; v2 always packages checked-out `HEAD`.
+- The default mode now packages checked-out `HEAD` automatically.
+- To deploy an existing `./deploy.tar`, provide `tar-file: ./deploy.tar` explicitly.
+- Generated and uncommitted files are excluded from the default source deployment. Package them into a tar file and use `tar-file` when they are required.
+
+App-token deployments run in detached mode. A successful action means CapRover accepted the deployment; final build and application health are handled by CapRover.

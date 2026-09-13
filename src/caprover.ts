@@ -33,13 +33,17 @@ export class CapRoverClient {
     await this.request(app, form, form.getHeaders());
   }
 
-  async deployImage(app: string, imageName: string): Promise<void> {
+  async deployImage(
+    app: string,
+    imageName: string,
+    gitHash: string,
+  ): Promise<void> {
     const body = JSON.stringify({
       captainDefinitionContent: JSON.stringify({
         schemaVersion: 2,
         imageName,
       }),
-      gitHash: "",
+      gitHash,
     });
     await this.request(app, body, {
       "content-type": "application/json",
