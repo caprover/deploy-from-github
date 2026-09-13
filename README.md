@@ -56,7 +56,19 @@ jobs:
                   password: ${{ secrets.GITHUB_TOKEN }}
             - name: Build and Push Release to DockerHub
               shell: bash
-              run: ./build_and_push.sh
+              run: |
+                  set -e
+
+                  cd $CONTEXT_DIR
+                  rm /tmp/build_args || echo OK
+                  env >/tmp/build_args
+                  echo "--build-arg \""$(cat /tmp/build_args | sed -z 's/\n/" --build-arg "/g')"IGNORE_VAR=IGNORE_VAR\"" >/tmp/build_args
+                  BUILD_ARGS=$(cat /tmp/build_args)
+                  COMMAND="docker build -t $FULL_IMAGE_NAME -t $IMAGE_NAME_WITH_REGISTRY:latest -f $DOCKERFILE $BUILD_ARGS --no-cache ."
+                  /bin/bash -c "$COMMAND"
+                  docker push $IMAGE_NAME_WITH_REGISTRY:latest
+                  docker push $FULL_IMAGE_NAME
+                  rm /tmp/build_args
             - name: Deploy to CapRover
               uses: caprover/deploy-from-github@d76580d79952f6841c453bb3ed37ef452b19752c
               with:
@@ -64,25 +76,6 @@ jobs:
                   app: ${{ env.CAPROVER_APP }}
                   token: '${{ secrets.CAPROVER_APP_TOKEN }}'
                   image: '${{ env.FULL_IMAGE_NAME }}'
-
-```
-
-`build_and_push.sh`
-```bash
-#!/bin/bash
-
-set -e
-
-cd $CONTEXT_DIR
-rm /tmp/build_args || echo OK
-env >/tmp/build_args
-echo "--build-arg \""$(cat /tmp/build_args | sed -z 's/\n/" --build-arg "/g')"IGNORE_VAR=IGNORE_VAR\"" >/tmp/build_args
-BUILD_ARGS=$(cat /tmp/build_args)
-COMMAND="docker build -t $FULL_IMAGE_NAME -t $IMAGE_NAME_WITH_REGISTRY:latest -f $DOCKERFILE $BUILD_ARGS --no-cache ."
-/bin/bash -c "$COMMAND"
-docker push $IMAGE_NAME_WITH_REGISTRY:latest
-docker push $FULL_IMAGE_NAME
-rm /tmp/build_args
 
 ```
 
