@@ -12,6 +12,19 @@ export interface TemporaryArchive {
   cleanup: () => Promise<void>;
 }
 
+export async function getHeadCommit(
+  workspace = process.env.GITHUB_WORKSPACE || process.cwd(),
+): Promise<string> {
+  const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+    cwd: workspace,
+  });
+  const gitHash = stdout.trim();
+  if (!/^[a-f0-9]{40}$/.test(gitHash)) {
+    throw new Error(`git rev-parse returned an invalid commit: ${gitHash}`);
+  }
+  return gitHash;
+}
+
 export async function createGitArchive(
   workingDirectory: string,
   workspace = process.env.GITHUB_WORKSPACE || process.cwd(),
@@ -45,13 +58,7 @@ export async function createGitArchive(
       ["archive", "--format=tar", "--output", archivePath, treeRef],
       { cwd: workspacePath },
     );
-    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
-      cwd: workspacePath,
-    });
-    const gitHash = stdout.trim();
-    if (!/^[a-f0-9]{40}$/.test(gitHash)) {
-      throw new Error(`git rev-parse returned an invalid commit: ${gitHash}`);
-    }
+    const gitHash = await getHeadCommit(workspacePath);
 
     return {
       path: archivePath,

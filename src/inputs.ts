@@ -1,4 +1,5 @@
 import { getInput, setSecret } from "./github.js";
+import path from "node:path";
 
 export interface Inputs {
   server: string;
@@ -32,7 +33,13 @@ export function getInputs(): Inputs {
 
   const image = getInput("image").trim();
   const tarFile = getInput("tar-file").trim();
-  const workingDirectory = getInput("working-directory").trim() || ".";
+  const normalizedWorkingDirectory = path.normalize(
+    getInput("working-directory").trim() || ".",
+  );
+  const workingDirectory =
+    normalizedWorkingDirectory === `.${path.sep}`
+      ? "."
+      : normalizedWorkingDirectory;
 
   if (image && tarFile) {
     throw new Error('Inputs "image" and "tar-file" cannot be used together');

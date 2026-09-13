@@ -6,7 +6,11 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -8877,11 +8881,11 @@ var require_mime_types = __commonJS({
       }
       return exts[0];
     }
-    function lookup(path3) {
-      if (!path3 || typeof path3 !== "string") {
+    function lookup(path4) {
+      if (!path4 || typeof path4 !== "string") {
         return false;
       }
-      var extension2 = extname("x." + path3).toLowerCase().substr(1);
+      var extension2 = extname("x." + path4).toLowerCase().substr(1);
       if (!extension2) {
         return false;
       }
@@ -9309,7 +9313,7 @@ var require_shams = __commonJS({
         return true;
       }
       var obj = {};
-      var sym = Symbol("test");
+      var sym = /* @__PURE__ */ Symbol("test");
       var symObj = Object(sym);
       if (typeof sym === "string") {
         return false;
@@ -9368,7 +9372,7 @@ var require_has_symbols = __commonJS({
       if (typeof origSymbol("foo") !== "symbol") {
         return false;
       }
-      if (typeof Symbol("bar") !== "symbol") {
+      if (typeof /* @__PURE__ */ Symbol("bar") !== "symbol") {
         return false;
       }
       return hasSymbolSham();
@@ -9986,7 +9990,7 @@ var require_form_data = __commonJS({
     "use strict";
     var CombinedStream = require_combined_stream();
     var util = require("util");
-    var path3 = require("path");
+    var path4 = require("path");
     var http2 = require("http");
     var https2 = require("https");
     var parseUrl = require("url").parse;
@@ -10117,11 +10121,11 @@ var require_form_data = __commonJS({
     FormData2.prototype._getContentDisposition = function(value, options) {
       var filename;
       if (typeof options.filepath === "string") {
-        filename = path3.normalize(options.filepath).replace(/\\/g, "/");
+        filename = path4.normalize(options.filepath).replace(/\\/g, "/");
       } else if (options.filename || value && (value.name || value.path)) {
-        filename = path3.basename(options.filename || value && (value.name || value.path));
+        filename = path4.basename(options.filename || value && (value.name || value.path));
       } else if (value && value.readable && hasOwn(value, "httpVersion")) {
-        filename = path3.basename(value.client._httpMessage.path || "");
+        filename = path4.basename(value.client._httpMessage.path || "");
       }
       if (filename) {
         return 'filename="' + escapeHeaderParam(filename) + '"';
@@ -10320,6 +10324,16 @@ var import_node_os = require("node:os");
 var import_node_path = __toESM(require("node:path"));
 var import_node_util = require("node:util");
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
+async function getHeadCommit(workspace = process.env.GITHUB_WORKSPACE || process.cwd()) {
+  const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+    cwd: workspace
+  });
+  const gitHash = stdout.trim();
+  if (!/^[a-f0-9]{40}$/.test(gitHash)) {
+    throw new Error(`git rev-parse returned an invalid commit: ${gitHash}`);
+  }
+  return gitHash;
+}
 async function createGitArchive(workingDirectory, workspace = process.env.GITHUB_WORKSPACE || process.cwd()) {
   const directory = await (0, import_promises.mkdtemp)(import_node_path.default.join((0, import_node_os.tmpdir)(), "caprover-deploy-"));
   const archivePath = import_node_path.default.join(directory, "deploy.tar");
@@ -10341,13 +10355,7 @@ async function createGitArchive(workingDirectory, workspace = process.env.GITHUB
       ["archive", "--format=tar", "--output", archivePath, treeRef],
       { cwd: workspacePath }
     );
-    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
-      cwd: workspacePath
-    });
-    const gitHash = stdout.trim();
-    if (!/^[a-f0-9]{40}$/.test(gitHash)) {
-      throw new Error(`git rev-parse returned an invalid commit: ${gitHash}`);
-    }
+    const gitHash = await getHeadCommit(workspacePath);
     return {
       path: archivePath,
       gitHash,
@@ -10368,11 +10376,13 @@ var import_node_http = __toESM(require("node:http"));
 var import_node_https = __toESM(require("node:https"));
 var import_form_data = __toESM(require_form_data());
 var SUCCESS = /* @__PURE__ */ new Set([100, 101]);
+var REQUEST_TIMEOUT_MS = 5 * 60 * 1e3;
 var CapRoverClient = class {
   constructor(server, token) {
     this.token = token;
     this.baseUrl = `${server.replace(/\/+$/, "")}/api/v2`;
   }
+  token;
   baseUrl;
   async uploadArchive(app, archivePath, gitHash) {
     const form = new import_form_data.default();
@@ -10411,6 +10421,14 @@ var CapRoverClient = class {
         },
         (response) => {
           const chunks = [];
+          response.on(
+            "error",
+            (error) => reject(new Error(`CapRover response failed: ${error.message}`))
+          );
+          response.on(
+            "aborted",
+            () => reject(new Error("CapRover response was aborted"))
+          );
           response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
           response.on("end", () => {
             const responseBody = Buffer.concat(chunks).toString("utf8");
@@ -10448,6 +10466,12 @@ var CapRoverClient = class {
       request.on(
         "error",
         (error) => reject(new Error(`Unable to reach CapRover: ${error.message}`))
+      );
+      request.setTimeout(
+        REQUEST_TIMEOUT_MS,
+        () => request.destroy(
+          new Error("CapRover request timed out after 5 minutes")
+        )
       );
       if (typeof body === "string") {
         request.end(body);
@@ -10489,8 +10513,13 @@ async function deploy(inputs) {
   info(`App:       ${inputs.app}`);
   info(`Server:    ${inputs.server}`);
   if (inputs.image) {
-    const candidateGitHash = (process.env.GITHUB_SHA || "").trim();
-    const gitHash = /^[a-f0-9]{40}$/i.test(candidateGitHash) ? candidateGitHash : "";
+    let gitHash = "";
+    try {
+      gitHash = await getHeadCommit();
+    } catch {
+      const candidateGitHash = (process.env.GITHUB_SHA || "").trim();
+      if (/^[a-f0-9]{40}$/i.test(candidateGitHash)) gitHash = candidateGitHash;
+    }
     info(`Image:     ${inputs.image}`);
     if (gitHash) info(`Commit:    ${gitHash.slice(0, 7)}`);
     info("");
@@ -10537,6 +10566,7 @@ async function deploy(inputs) {
 }
 
 // src/inputs.ts
+var import_node_path3 = __toESM(require("node:path"));
 function readRequiredInput(name) {
   const value = getInput(name).trim();
   if (!value) {
@@ -10557,7 +10587,10 @@ function getInputs() {
   }
   const image = getInput("image").trim();
   const tarFile = getInput("tar-file").trim();
-  const workingDirectory = getInput("working-directory").trim() || ".";
+  const normalizedWorkingDirectory = import_node_path3.default.normalize(
+    getInput("working-directory").trim() || "."
+  );
+  const workingDirectory = normalizedWorkingDirectory === `.${import_node_path3.default.sep}` ? "." : normalizedWorkingDirectory;
   if (image && tarFile) {
     throw new Error('Inputs "image" and "tar-file" cannot be used together');
   }
@@ -10585,9 +10618,7 @@ async function run() {
     setFailed(error instanceof Error ? error.message : String(error));
   }
 }
-if (process.env.NODE_ENV !== "test") {
-  void run();
-}
+void run();
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   run

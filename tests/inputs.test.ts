@@ -77,6 +77,19 @@ describe("getInputs", () => {
     },
   );
 
+  it.each(["image", "tar-file"])(
+    'accepts "./" as the workspace root with %s mode',
+    (mode) => {
+      getInput.mockImplementation((name) => {
+        if (name === mode) return "value";
+        if (name === "working-directory") return "./";
+        if (name === "server") return "https://captain.example.com";
+        return ["app", "token"].includes(name) ? "value" : "";
+      });
+      expect(getInputs().workingDirectory).toBe(".");
+    },
+  );
+
   it('identifies an invalid "server" URL', () => {
     getInput.mockImplementation((name) => {
       if (name === "server") return "captain.example.com";

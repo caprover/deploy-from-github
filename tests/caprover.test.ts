@@ -112,4 +112,31 @@ describe("CapRoverClient", () => {
       "CapRover rejected the deployment (status 1106): App token is invalid",
     );
   });
+
+  it("rejects when the CapRover response is interrupted", async () => {
+    const server = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.write('{"status":');
+        setImmediate(() => response.destroy());
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    closers.push(
+      () => new Promise<void>((resolve) => server.close(() => resolve())),
+    );
+    const address = server.address();
+    if (!address || typeof address === "string")
+      throw new Error("Missing address");
+
+    await expect(
+      new CapRoverClient(
+        `http://127.0.0.1:${address.port}`,
+        "token",
+      ).deployImage("app", "image", ""),
+    ).rejects.toThrow(/CapRover response (was aborted|failed)/);
+  });
 });

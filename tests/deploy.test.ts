@@ -2,13 +2,16 @@ import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createGitArchive } from "../src/archive.js";
+import { createGitArchive, getHeadCommit } from "../src/archive.js";
 import { CapRoverClient } from "../src/caprover.js";
 import { deploy } from "../src/deploy.js";
 import { Inputs } from "../src/inputs.js";
 
 vi.mock("../src/github.js", () => ({ info: vi.fn() }));
-vi.mock("../src/archive.js", () => ({ createGitArchive: vi.fn() }));
+vi.mock("../src/archive.js", () => ({
+  createGitArchive: vi.fn(),
+  getHeadCommit: vi.fn(),
+}));
 vi.mock("../src/caprover.js", () => ({
   CapRoverClient: vi.fn(function () {
     return { uploadArchive: vi.fn(), deployImage: vi.fn() };
@@ -34,7 +37,10 @@ afterEach(async () => {
   );
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(getHeadCommit).mockRejectedValue(new Error("No checkout"));
+});
 
 function client() {
   return vi.mocked(CapRoverClient).mock.results[0].value as {
@@ -46,13 +52,25 @@ function client() {
 describe("deploy v2 behavior", () => {
   it("deploys an image with commit metadata", async () => {
     process.env.GITHUB_SHA = "a".repeat(40);
+    vi.mocked(getHeadCommit).mockResolvedValue("b".repeat(40));
+    await deploy({ ...base, image: "image:sha" });
+    expect(client().deployImage).toHaveBeenCalledWith(
+      "my-api",
+      "image:sha",
+      "b".repeat(40),
+    );
+    expect(createGitArchive).not.toHaveBeenCalled();
+    delete process.env.GITHUB_SHA;
+  });
+
+  it("uses GITHUB_SHA for image metadata when source is not checked out", async () => {
+    process.env.GITHUB_SHA = "a".repeat(40);
     await deploy({ ...base, image: "image:sha" });
     expect(client().deployImage).toHaveBeenCalledWith(
       "my-api",
       "image:sha",
       "a".repeat(40),
     );
-    expect(createGitArchive).not.toHaveBeenCalled();
     delete process.env.GITHUB_SHA;
   });
 

@@ -1,6 +1,6 @@
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import { createGitArchive } from "./archive.js";
+import { createGitArchive, getHeadCommit } from "./archive.js";
 import { CapRoverClient } from "./caprover.js";
 import { info } from "./github.js";
 import { Inputs } from "./inputs.js";
@@ -14,10 +14,13 @@ export async function deploy(inputs: Inputs): Promise<void> {
   info(`Server:    ${inputs.server}`);
 
   if (inputs.image) {
-    const candidateGitHash = (process.env.GITHUB_SHA || "").trim();
-    const gitHash = /^[a-f0-9]{40}$/i.test(candidateGitHash)
-      ? candidateGitHash
-      : "";
+    let gitHash = "";
+    try {
+      gitHash = await getHeadCommit();
+    } catch {
+      const candidateGitHash = (process.env.GITHUB_SHA || "").trim();
+      if (/^[a-f0-9]{40}$/i.test(candidateGitHash)) gitHash = candidateGitHash;
+    }
     info(`Image:     ${inputs.image}`);
     if (gitHash) info(`Commit:    ${gitHash.slice(0, 7)}`);
     info("");
