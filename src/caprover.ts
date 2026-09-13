@@ -4,6 +4,7 @@ import https from "node:https";
 import FormData from "form-data";
 
 const SUCCESS = new Set([100, 101]);
+const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface ApiResponse {
   status?: number;
@@ -69,6 +70,12 @@ export class CapRoverClient {
         },
         (response) => {
           const chunks: Buffer[] = [];
+          response.on("error", (error) =>
+            reject(new Error(`CapRover response failed: ${error.message}`)),
+          );
+          response.on("aborted", () =>
+            reject(new Error("CapRover response was aborted")),
+          );
           response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
           response.on("end", () => {
             const responseBody = Buffer.concat(chunks).toString("utf8");
@@ -111,6 +118,11 @@ export class CapRoverClient {
       );
       request.on("error", (error) =>
         reject(new Error(`Unable to reach CapRover: ${error.message}`)),
+      );
+      request.setTimeout(REQUEST_TIMEOUT_MS, () =>
+        request.destroy(
+          new Error("CapRover request timed out after 5 minutes"),
+        ),
       );
 
       if (typeof body === "string") {

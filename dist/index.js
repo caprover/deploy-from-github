@@ -6,7 +6,11 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -9309,7 +9313,7 @@ var require_shams = __commonJS({
         return true;
       }
       var obj = {};
-      var sym = Symbol("test");
+      var sym = /* @__PURE__ */ Symbol("test");
       var symObj = Object(sym);
       if (typeof sym === "string") {
         return false;
@@ -9368,7 +9372,7 @@ var require_has_symbols = __commonJS({
       if (typeof origSymbol("foo") !== "symbol") {
         return false;
       }
-      if (typeof Symbol("bar") !== "symbol") {
+      if (typeof /* @__PURE__ */ Symbol("bar") !== "symbol") {
         return false;
       }
       return hasSymbolSham();
@@ -10354,11 +10358,13 @@ var import_node_http = __toESM(require("node:http"));
 var import_node_https = __toESM(require("node:https"));
 var import_form_data = __toESM(require_form_data());
 var SUCCESS = /* @__PURE__ */ new Set([100, 101]);
+var REQUEST_TIMEOUT_MS = 5 * 60 * 1e3;
 var CapRoverClient = class {
   constructor(server, token) {
     this.token = token;
     this.baseUrl = `${server.replace(/\/+$/, "")}/api/v2`;
   }
+  token;
   baseUrl;
   async uploadArchive(app, archivePath, gitHash) {
     const form = new import_form_data.default();
@@ -10397,6 +10403,14 @@ var CapRoverClient = class {
         },
         (response) => {
           const chunks = [];
+          response.on(
+            "error",
+            (error) => reject(new Error(`CapRover response failed: ${error.message}`))
+          );
+          response.on(
+            "aborted",
+            () => reject(new Error("CapRover response was aborted"))
+          );
           response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
           response.on("end", () => {
             const responseBody = Buffer.concat(chunks).toString("utf8");
@@ -10434,6 +10448,12 @@ var CapRoverClient = class {
       request.on(
         "error",
         (error) => reject(new Error(`Unable to reach CapRover: ${error.message}`))
+      );
+      request.setTimeout(
+        REQUEST_TIMEOUT_MS,
+        () => request.destroy(
+          new Error("CapRover request timed out after 5 minutes")
+        )
       );
       if (typeof body === "string") {
         request.end(body);
@@ -10525,9 +10545,7 @@ async function run() {
     setFailed(error instanceof Error ? error.message : String(error));
   }
 }
-if (process.env.NODE_ENV !== "test") {
-  void run();
-}
+void run();
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   run
