@@ -39,6 +39,8 @@ For production deployments, this is the recommended approach. Build and push the
     push: true
     tags: ghcr.io/YOUR_USERNAME/YOUR_APP:${{ github.sha }}
 
+# If this image is private, configure the registry credentials in CapRover first.
+# See "Private registries" below.
 - uses: caprover/deploy-from-github@v2
   with:
     server: https://captain.example.com
