@@ -2,11 +2,27 @@
 
 Deploy checked-out source, a Docker image, or a prepared tar file to CapRover using an app token.
 
-## Quick start (recommended)
+## Quick start
 
-For most deployments, build the Docker image on GitHub Actions, push it to a registry, and ask CapRover to deploy that image.
+```yaml
+- uses: actions/checkout@v6
 
-This keeps the expensive image build off your CapRover server, avoids consuming production CPU and memory during deployments, and lets GitHub Actions handle build caching and build logs.
+- uses: caprover/deploy-from-github@v2
+  with:
+    server: https://captain.example.com
+    app: my-api
+    token: ${{ secrets.CAPROVER_APP_TOKEN }}
+```
+
+This packages the files committed in the checked-out `HEAD` and submits the deployment to CapRover. Generate an app token from the app's **Deployment** tab in CapRover.
+
+> **Important:** This is the simplest deployment setup, but CapRover builds the Docker image on your server. Builds can consume significant CPU, memory, disk I/O, and storage during deployment. For production workloads, we strongly recommend building the image in GitHub Actions and deploying the pre-built image instead, as shown below.
+
+App tokens and deployment data are sent to the configured server. Use HTTPS unless the server is reached through a trusted private network.
+
+## Deploy a Docker image
+
+For production deployments, this is the recommended approach. Build and push the image with the standard Docker actions, then ask CapRover to deploy it. The image build runs on GitHub Actions instead of consuming resources on your CapRover server.
 
 ```yaml
 - uses: actions/checkout@v6
@@ -30,30 +46,6 @@ This keeps the expensive image build off your CapRover server, avoids consuming 
     token: ${{ secrets.CAPROVER_APP_TOKEN }}
     image: ghcr.io/acme/my-api:${{ github.sha }}
 ```
-
-Generate an app token from the app's **Deployment** tab in CapRover.
-
-CapRover pulls the image from the registry during deployment. If the image is private, configure the registry credentials in CapRover as well. Logging the GitHub runner into the registry only grants access to the runner.
-
-App tokens and deployment data are sent to the configured server. Use HTTPS unless the server is reached through a trusted private network.
-
-## Deploy source directly
-
-For simple projects or quick testing, you can send the checked-out source directly to CapRover:
-
-```yaml
-- uses: actions/checkout@v6
-
-- uses: caprover/deploy-from-github@v2
-  with:
-    server: https://captain.example.com
-    app: my-api
-    token: ${{ secrets.CAPROVER_APP_TOKEN }}
-```
-
-This packages the files committed in the checked-out `HEAD` and submits them to CapRover. CapRover then builds the Docker image on your server.
-
-For production deployments, image-based deployment is strongly recommended. Building from source on the CapRover server consumes the server's CPU, memory, disk I/O, and build cache space during every deployment. Building and pushing the image in GitHub Actions keeps those build resources off the server and gives you a reusable, immutable deployment artifact.
 
 ## Monorepo
 
@@ -84,8 +76,6 @@ Use `tar-file` when an earlier step produces the exact deployment archive:
     token: ${{ secrets.CAPROVER_APP_TOKEN }}
     tar-file: ./dist/deploy.tar
 ```
-
-Like direct source deployment, CapRover builds the resulting image on the server. Prefer deploying a pre-built image for production workloads when possible.
 
 ## Inputs
 
