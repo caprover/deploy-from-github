@@ -4,7 +4,7 @@ import https from "node:https";
 import FormData from "form-data";
 
 const SUCCESS = new Set([100, 101]);
-const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const REQUEST_INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface ApiResponse {
   status?: number;
@@ -119,9 +119,9 @@ export class CapRoverClient {
       request.on("error", (error) =>
         reject(new Error(`Unable to reach CapRover: ${error.message}`)),
       );
-      request.setTimeout(REQUEST_TIMEOUT_MS, () =>
+      request.setTimeout(REQUEST_INACTIVITY_TIMEOUT_MS, () =>
         request.destroy(
-          new Error("CapRover request timed out after 5 minutes"),
+          new Error("CapRover request was inactive for 5 minutes"),
         ),
       );
 

@@ -26,6 +26,7 @@ const base: Inputs = {
 const directories: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     directories
       .splice(0)
@@ -91,20 +92,18 @@ describe("deploy v1 behavior", () => {
     directories.push(workspace);
     const tarPath = path.join(workspace, "deploy.tar");
     await writeFile(tarPath, "fixture");
-    process.env.GITHUB_WORKSPACE = workspace;
+    vi.stubEnv("GITHUB_WORKSPACE", workspace);
     await deploy(base);
     expect(client().uploadArchive).toHaveBeenCalledWith("my-api", tarPath, "");
-    delete process.env.GITHUB_WORKSPACE;
   });
 
   it("fails clearly when implicit deploy.tar is missing", async () => {
     const workspace = await mkdtemp(path.join(tmpdir(), "empty-workspace-"));
     directories.push(workspace);
-    process.env.GITHUB_WORKSPACE = workspace;
+    vi.stubEnv("GITHUB_WORKSPACE", workspace);
     await expect(deploy(base)).rejects.toThrow(
       `Deployment archive was not found: ${path.join(workspace, "deploy.tar")}`,
     );
     await expect(access(path.join(workspace, "deploy.tar"))).rejects.toThrow();
-    delete process.env.GITHUB_WORKSPACE;
   });
 });

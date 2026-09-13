@@ -13,6 +13,8 @@ Optional:
 - `branch` secret can be used to specify the branch you want to deploy to CapRover.
 - If `image` and `branch` are empty, this action expects a tar file located at the root of the project `./deploy.tar` to deploy
 
+App tokens and deployment data are sent to the configured server. Use HTTPS unless the server is reached through a trusted private network.
+
 
 
 ### Example 1 - deploy using image:
@@ -134,4 +136,3 @@ jobs:
 ```
 
 NOTE: Deployments take place within seconds after the workflow has been processed succesfully with any failed deployments sending an email alert to your email on file with Github.
-

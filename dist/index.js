@@ -10358,7 +10358,7 @@ var import_node_http = __toESM(require("node:http"));
 var import_node_https = __toESM(require("node:https"));
 var import_form_data = __toESM(require_form_data());
 var SUCCESS = /* @__PURE__ */ new Set([100, 101]);
-var REQUEST_TIMEOUT_MS = 5 * 60 * 1e3;
+var REQUEST_INACTIVITY_TIMEOUT_MS = 5 * 60 * 1e3;
 var CapRoverClient = class {
   constructor(server, token) {
     this.token = token;
@@ -10450,9 +10450,9 @@ var CapRoverClient = class {
         (error) => reject(new Error(`Unable to reach CapRover: ${error.message}`))
       );
       request.setTimeout(
-        REQUEST_TIMEOUT_MS,
+        REQUEST_INACTIVITY_TIMEOUT_MS,
         () => request.destroy(
-          new Error("CapRover request timed out after 5 minutes")
+          new Error("CapRover request was inactive for 5 minutes")
         )
       );
       if (typeof body === "string") {
