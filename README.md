@@ -37,14 +37,14 @@ For production deployments, this is the recommended approach. Build and push the
   with:
     context: .
     push: true
-    tags: ghcr.io/acme/my-api:${{ github.sha }}
+    tags: ghcr.io/YOUR_USERNAME/YOUR_APP:${{ github.sha }}
 
 - uses: caprover/deploy-from-github@v2
   with:
     server: https://captain.example.com
     app: my-api
     token: ${{ secrets.CAPROVER_APP_TOKEN }}
-    image: ghcr.io/acme/my-api:${{ github.sha }}
+    image: ghcr.io/YOUR_USERNAME/YOUR_APP:${{ github.sha }}
 ```
 
 ## Monorepo
