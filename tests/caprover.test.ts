@@ -86,6 +86,7 @@ describe("CapRoverClient", () => {
     await new CapRoverClient(server.url, "token").deployImage(
       "my-api",
       "ghcr.io/acme/api:sha",
+      "a".repeat(40),
     );
     const request = await server.request;
     const payload = JSON.parse(request.body.toString());
@@ -93,7 +94,7 @@ describe("CapRoverClient", () => {
       schemaVersion: 2,
       imageName: "ghcr.io/acme/api:sha",
     });
-    expect(payload.gitHash).toBe("");
+    expect(payload.gitHash).toBe("a".repeat(40));
   });
 
   it("propagates a useful CapRover API error", async () => {
@@ -102,7 +103,11 @@ describe("CapRoverClient", () => {
       description: "App token is invalid",
     });
     await expect(
-      new CapRoverClient(server.url, "bad-token").deployImage("app", "image"),
+      new CapRoverClient(server.url, "bad-token").deployImage(
+        "app",
+        "image",
+        "",
+      ),
     ).rejects.toThrow(
       "CapRover rejected the deployment (status 1106): App token is invalid",
     );

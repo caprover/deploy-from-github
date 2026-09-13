@@ -10060,12 +10060,12 @@ var require_form_data = __commonJS({
         if (value.end != void 0 && value.end != Infinity && value.start != void 0) {
           callback(null, value.end + 1 - (value.start ? value.start : 0));
         } else {
-          fs.stat(value.path, function(err, stat) {
+          fs.stat(value.path, function(err, stat3) {
             if (err) {
               callback(err);
               return;
             }
-            var fileSize = stat.size - (value.start ? value.start : 0);
+            var fileSize = stat3.size - (value.start ? value.start : 0);
             callback(null, fileSize);
           });
         }
@@ -10320,17 +10320,29 @@ var import_node_os = require("node:os");
 var import_node_path = __toESM(require("node:path"));
 var import_node_util = require("node:util");
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
-async function createGitArchive(ref, cwd = process.env.GITHUB_WORKSPACE || process.cwd()) {
+async function createGitArchive(workingDirectory, workspace = process.env.GITHUB_WORKSPACE || process.cwd()) {
   const directory = await (0, import_promises.mkdtemp)(import_node_path.default.join((0, import_node_os.tmpdir)(), "caprover-deploy-"));
   const archivePath = import_node_path.default.join(directory, "deploy.tar");
   try {
+    const workspacePath = await (0, import_promises.realpath)(workspace);
+    const sourcePath = await (0, import_promises.realpath)(
+      import_node_path.default.resolve(workspacePath, workingDirectory)
+    );
+    const sourceStat = await (0, import_promises.stat)(sourcePath);
+    const relativeSource = import_node_path.default.relative(workspacePath, sourcePath);
+    if (!sourceStat.isDirectory() || relativeSource === ".." || relativeSource.startsWith(`..${import_node_path.default.sep}`) || import_node_path.default.isAbsolute(relativeSource)) {
+      throw new Error(
+        "must resolve to a directory inside the GitHub workspace"
+      );
+    }
+    const treeRef = relativeSource ? `HEAD:${relativeSource.split(import_node_path.default.sep).join("/")}` : "HEAD";
     await execFileAsync(
       "git",
-      ["archive", "--format=tar", "--output", archivePath, ref],
-      { cwd }
+      ["archive", "--format=tar", "--output", archivePath, treeRef],
+      { cwd: workspacePath }
     );
-    const { stdout } = await execFileAsync("git", ["rev-parse", ref], {
-      cwd
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+      cwd: workspacePath
     });
     const gitHash = stdout.trim();
     if (!/^[a-f0-9]{40}$/.test(gitHash)) {
@@ -10344,7 +10356,9 @@ async function createGitArchive(ref, cwd = process.env.GITHUB_WORKSPACE || proce
   } catch (error) {
     await (0, import_promises.rm)(directory, { recursive: true, force: true });
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to archive Git ref "${ref}": ${message}`);
+    throw new Error(
+      `Failed to archive input "working-directory" (${workingDirectory}): ${message}`
+    );
   }
 }
 
@@ -10366,13 +10380,13 @@ var CapRoverClient = class {
     form.append("gitHash", gitHash);
     await this.request(app, form, form.getHeaders());
   }
-  async deployImage(app, imageName) {
+  async deployImage(app, imageName, gitHash) {
     const body = JSON.stringify({
       captainDefinitionContent: JSON.stringify({
         schemaVersion: 2,
         imageName
       }),
-      gitHash: ""
+      gitHash
     });
     await this.request(app, body, {
       "content-type": "application/json",
@@ -10470,15 +10484,29 @@ function setFailed(message) {
 // src/deploy.ts
 async function deploy(inputs) {
   const client = new CapRoverClient(inputs.server, inputs.token);
+  info("Deploying to CapRover");
+  info("");
+  info(`App:       ${inputs.app}`);
+  info(`Server:    ${inputs.server}`);
   if (inputs.image) {
-    info(`Deploying image ${inputs.image} to ${inputs.app}...`);
-    await client.deployImage(inputs.app, inputs.image);
+    const candidateGitHash = (process.env.GITHUB_SHA || "").trim();
+    const gitHash = /^[a-f0-9]{40}$/i.test(candidateGitHash) ? candidateGitHash : "";
+    info(`Image:     ${inputs.image}`);
+    if (gitHash) info(`Commit:    ${gitHash.slice(0, 7)}`);
+    info("");
+    await client.deployImage(inputs.app, inputs.image, gitHash);
     return;
   }
-  if (inputs.branch) {
-    const archive = await createGitArchive(inputs.branch);
+  if (!inputs.tarFile) {
+    const archive = await createGitArchive(inputs.workingDirectory);
     try {
-      info(`Deploying Git ref ${inputs.branch} to ${inputs.app}...`);
+      info("Source:    Git commit");
+      info(`Commit:    ${archive.gitHash.slice(0, 7)}`);
+      if (inputs.workingDirectory !== ".") {
+        info(`Directory: ${inputs.workingDirectory}`);
+      }
+      info("");
+      info("\u2713 Source packaged");
       await client.uploadArchive(inputs.app, archive.path, archive.gitHash);
     } finally {
       await archive.cleanup();
@@ -10486,13 +10514,25 @@ async function deploy(inputs) {
     return;
   }
   const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
-  const tarPath = import_node_path2.default.resolve(workspace, "deploy.tar");
+  const workspacePath = await (0, import_promises2.realpath)(workspace);
+  const requestedTarPath = import_node_path2.default.resolve(workspacePath, inputs.tarFile);
+  let tarPath;
   try {
-    await (0, import_promises2.access)(tarPath);
+    tarPath = await (0, import_promises2.realpath)(requestedTarPath);
+    const relativeTarPath = import_node_path2.default.relative(workspacePath, tarPath);
+    if (relativeTarPath === ".." || relativeTarPath.startsWith(`..${import_node_path2.default.sep}`) || import_node_path2.default.isAbsolute(relativeTarPath)) {
+      throw new Error("path is outside the workspace");
+    }
+    const tarStat = await (0, import_promises2.stat)(tarPath);
+    if (!tarStat.isFile()) throw new Error("path is not a file");
   } catch {
-    throw new Error(`Deployment archive was not found: ${tarPath}`);
+    throw new Error(
+      `Input "tar-file" does not point to a file inside the GitHub workspace: ${requestedTarPath}`
+    );
   }
-  info(`Deploying ${tarPath} to ${inputs.app}...`);
+  info(`Source:    Prepared tar`);
+  info(`Tar file:  ${inputs.tarFile}`);
+  info("");
   await client.uploadArchive(inputs.app, tarPath, "");
 }
 
@@ -10507,12 +10547,32 @@ function readRequiredInput(name) {
 function getInputs() {
   const token = readRequiredInput("token");
   setSecret(token);
+  const server = readRequiredInput("server");
+  try {
+    const url = new URL(server);
+    if (url.protocol !== "http:" && url.protocol !== "https:")
+      throw new Error();
+  } catch {
+    throw new Error('Input "server" must be a valid HTTP or HTTPS URL');
+  }
+  const image = getInput("image").trim();
+  const tarFile = getInput("tar-file").trim();
+  const workingDirectory = getInput("working-directory").trim() || ".";
+  if (image && tarFile) {
+    throw new Error('Inputs "image" and "tar-file" cannot be used together');
+  }
+  if ((image || tarFile) && workingDirectory !== ".") {
+    throw new Error(
+      'Input "working-directory" can only be used for source deployment'
+    );
+  }
   return {
-    server: readRequiredInput("server"),
+    server,
     app: readRequiredInput("app"),
     token,
-    branch: getInput("branch").trim(),
-    image: getInput("image").trim()
+    image,
+    tarFile,
+    workingDirectory
   };
 }
 
@@ -10520,7 +10580,7 @@ function getInputs() {
 async function run() {
   try {
     await deploy(getInputs());
-    info("Deployment accepted by CapRover");
+    info("\u2713 Deployment accepted by CapRover");
   } catch (error) {
     setFailed(error instanceof Error ? error.message : String(error));
   }
