@@ -1,31 +1,24 @@
-name: 'Deploy Github repo to Caprover'
-description: 'Github Action for deploying your app to Caprover.'
-author: 'Caprover Contributors'
+name: "Deploy Github repo to Caprover"
+description: "Github Action for deploying your app to Caprover."
+author: "Caprover Contributors"
 
 inputs:
   server:
-    description: 'Captover server URL, i.e. https://captain.apps.your-domain.com.'
+    description: "CapRover server URL, i.e. https://captain.apps.your-domain.com."
     required: true
   token:
-    description: 'App Token'
+    description: "App Token"
     required: true
   app:
-    description: 'App Name'
+    description: "App Name"
     required: true
   branch:
-    description: 'Branch to be deployed'
+    description: "Branch to be deployed"
     required: false
   image:
-    description: 'Docker image to be deployed'
+    description: "Docker image to be deployed"
     required: false
 
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
-#   image: 'docker://ghcr.io/caprover/deploy-from-github:main'
-#   env:
-#     server: ${{ inputs.server }}
-#     app: ${{ inputs.app }}
-#     token: ${{ inputs.token }}
-#     image: ${{ inputs.image }}
-#     branch: ${{ inputs.branch }}
+  using: "node24"
+  main: "dist/index.js"
